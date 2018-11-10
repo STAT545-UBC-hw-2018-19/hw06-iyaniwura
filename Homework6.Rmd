@@ -1,0 +1,820 @@
+---
+title: "Homework 06: Data wrangling wrap up"
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: cerulean
+        number_sections: true
+editor_options: 
+  chunk_output_type: inline
+---
+
+# Loading libraries
+
+First, we load the necessary libraries required for the exercises in this assignment:
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+library(stringr)
+library(repurrrsive)
+library(gapminder)
+library(ggplot2)
+library(readr)
+```
+
+
+# Writing functions
+
+In this exercise, we learn how to write a function in R. We shall be using the Gapminder data set for this exercise. 
+
+## Linear regression:
+
+  We first write a function that accepts a country name in the `gapminder` data set as input and fits linear regression model to its `gdpPercap` over the years. The input is specified as a string.
+
+```{r}
+# function that fits a linear regression to the gdpPercap of a specified country over and  plot the result
+
+linear_fit <- function(c_name){
+   Extract_data <- gapminder %>%
+          filter(country==c_name)
+  mini_df <- Extract_data # calls the function that extracts the data for the specified country
+  fit <- lm(gdpPercap ~ year, mini_df) # fits the linear regression
+ 
+  # ggplot of result
+  plt <- ggplot(mini_df,aes(year,gdpPercap)) +
+      geom_point() + geom_smooth(method ="lm", se = FALSE) +
+      ggtitle(str_c("GDP per cap. for ",c_name," over the years with a linear regression line "))
+  
+ coeff <- coef(fit)
+ plt
+  return(list(coeff,plt)) # returns the outputs as a list
+  }
+
+```
+
+Let us test our function by calling it with some country;
+
+```{r}
+# testing the linear_fit function
+result1 <- linear_fit("Canada")
+result1[1] # displays the coefficients of the fit
+result1[2] # plots the result
+```
+
+How about another country;
+
+```{r}
+# testing the linear_fit function
+result2 <- linear_fit("Ghana")
+result2[1] # displays the coefficients of the fit
+result2[2] # plots the result
+```
+
+
+##  Multiple linear regression
+
+Here, we write a function that fits multiple linear regression to data from gapminder data set.  The function accept the country name as input (as a string) and fits a multiple linear regression to the `gdpPercap`, `pop`, and `lifeExp` in the form `gdpPercap = intercept + lifeExp*x1 + pop*x2`. The output of the function is the coefficients of the fit.
+
+```{r}
+Multi_linear_fit <- function(c_name){
+  Extract_data <- gapminder %>%
+          filter(country==c_name)
+  mini_df <- Extract_data # calls the function that extracts the data for the specified country
+  fit <- lm(gdpPercap ~ lifeExp + pop, mini_df) # fits the linear regression
+ 
+ coef(fit)
+}
+```
+
+Now, let us test our function;
+
+```{r}
+# testing the Multi_linear_fit function
+Multi_linear_fit("Canada")
+```
+
+A second test;
+
+```{r}
+# testing the  Multi_linear_fit function
+Multi_linear_fit("Ghana")
+```
+
+The `Multi_linear_fit` function returns the coefficients of the fit.
+
+## Quadratic fit
+
+Next, we write a function that fits a quadratic functiont to a data set. This function accepts a country name as a string from the list of country in the gapminder data set and fit a quadractic curve to the `gdpPercap` with respect to  `lifeExp`. Here, the independent variable is `lifeExp` while `gdpPercap` is the dependent variable. The function returns the coefficient of the fit.
+
+```{r}
+Quadratic_fit <- function(c_name){
+  Extract_data <- gapminder %>%
+          filter(country==c_name)
+  mini_df <- Extract_data # calls the function that extracts the data for the specified country
+  fit <- lm(gdpPercap ~ lifeExp + I(lifeExp^2), mini_df) # fits the Quadratic regression
+ 
+ coef(fit)
+}
+```
+
+Let us test our function;
+
+```{r}
+# testing the function
+Quadratic_fit("Canada")
+```
+
+We perform a second test with Nigeria.
+
+```{r}
+# testing the function
+Quadratic_fit("Nigeria")
+```
+
+
+# Work with the Candy data
+
+In this exercise, we shall practice basic data ingest, exploration, character data cleanup, and wrangling. The data to be explored is collected from `Halloween candy survey`.
+
+## Loading the data set
+
+```{r}
+# reading the data from file
+HallCandy_raw <- read_csv("CANDY-HIERARCHY-2015 SURVEY-Responses.csv",
+                col_types = cols(
+                  Timestamp = col_datetime("%m/%d/%Y %H:%M:%S")
+                ))
+```
+
+## Exploring the structure and properties of the data set
+
+We begin by checking the  structure of the data set
+
+```{r}
+str(HallCandy_raw) %>%
+      head()
+```
+
+It is a data frame with 5658 observations  of  124 variables. Next, we look at the type
+
+```{r}
+typeof(HallCandy_raw)
+```
+
+This says it is a list, we know that a data frame is a type of list.
+
+Now, let us take a look at the first few rows of the data set.
+
+```{r}
+HallCandy_raw %>%
+  head()
+```
+
+Let us check the dimension of the data set.
+
+```{r}
+dim(HallCandy_raw)
+```
+
+## Create respondent ID
+
+Let us create an ID variable for each of the survey respondent, and rename the column titled "How old are you to age" to "age". We then make the ID column to be the first column followed by the age column, followed by other columns. 
+
+```{r}
+ID_HallCandy_raw <- HallCandy_raw %>%
+  mutate(id = sprintf("ID%04d", row_number())) %>%  # creates a new column called id with  ID for each survey
+  select(id, 
+         age = starts_with("How"), 
+         everything())  # rename How old are you to age" to age and re-arrange the columns
+```
+
+Let us view the new data frame
+
+```{r}
+ID_HallCandy_raw %>%
+  head()
+```
+
+We see that the first column is `ID` and the column containing ages has been renamed.
+
+## Cleaning the `age` column
+
+Let us clean the `age` column by removing any entry with age of length more than 2 or NA.
+
+```{r}
+# create a temporary column the contains the length of each entry in `age`
+Temp_Col <- ID_HallCandy_raw %>%
+  mutate(age_nchar = str_length(age))  # make a new column with the length of the ages
+```
+
+Let us plot a barchart of `Temp_Col` so that we can see the distribution of the lenght of the ages entered.
+
+```{r}
+Temp_Col %>%
+  filter(age_nchar < 10) %>%  # extract data that have age_nchar > 10
+  ggplot(aes(age_nchar)) + geom_bar(color='red', fill='red')
+```
+
+We see from this barchart that most of the entries in the `age` column have length 2 except for a few exceptions. Our goal is to remove all those data and those with `NA`.
+
+```{r}
+# this code removes age with length > 2
+ID_HallCandy_raw <- Temp_Col %>%
+        filter(age_nchar <= 2) %>%
+        select(-age_nchar) %>%
+        mutate(age = as.integer(age)) %>%
+        filter(!is.na(age))
+
+```
+
+Let us check if there are still age that have length longer than 2 or is NA.
+
+```{r}
+ID_HallCandy_raw %>% 
+  select(age) %>%
+  mutate(age_nchar = str_length(age)) %>%
+  filter(age_nchar > 2 | age_nchar == NA)
+```
+
+This shows that there is no `age` with length more than two characters and `NA`. Let see the dimension of the new data set after cleaning the `age` column.
+
+```{r}
+dim(ID_HallCandy_raw)  # original dim of data 5658  124
+```
+
+Recall that the original number of observations is 5658. The new data set has 5351 row, which means 307 rows have been removed. 
+
+## Cleaning `candy names` column
+
+Next we clean the column that contains `candy names`. To do this, we shall remove those `[` from the candy names. We begin by creating a new data frame with 4 columns. These columns are as follows;
+
+1. candy names as in the original data set
+2. Determine if it is a candy name or not. If the variable name is in `[]`, it is considered a candy name.
+3. The new candy name, which is just the old name without the brackets `[]`
+4. It indicates if the name was changed or not
+
+```{r}
+
+Temp_names <-  data_frame(orig_name = names(ID_HallCandy_raw)) %>%  
+                mutate(is_candy = str_detect(orig_name,"^\\["),             # 
+                new_name = str_replace_all(orig_name, "(^\\[)(.*)(\\]$)", "\\2"),
+                new_name = str_replace_all(new_name, '["’]', "'"),
+                is_changed = orig_name != new_name)
+```
+
+Let us take a look at the data frame.
+
+```{r}
+Temp_names %>%
+  head() %>%
+  knitr::kable()
+```
+
+How many of the varibales are candy names?
+
+```{r}
+sum(Temp_names$is_candy)  # counts those rows that have candy names
+```
+
+Now, we replace the original names in the data set with the new names.
+
+```{r}
+names(ID_HallCandy_raw) <- Temp_names$new_name  # replace the  names in Halloween data frame with the cleaned names
+```
+
+
+## Write `ID` and candy variables to file
+
+Next, we shall write id and the candy variables out to file.
+
+```{r}
+# extract the variables that are candy names
+candy_names <- Temp_names %>%
+  filter(is_candy) %>%  # extract names with is_candy = TRUE and pipes it into the next line   
+  .$new_name
+length(candy_names)
+```
+
+This shows that 95 of our varibales names are candy names. We shall the candy names and write them to  a file together with thier id.
+
+```{r}
+candy_data_untidy <- ID_HallCandy_raw %>%
+  select(one_of(c("id", candy_names)))
+
+write_csv(candy_data_untidy, "candy-joy-untidy.csv")
+```
+
+
+## Write other variables to file
+
+We shall create a table of some selective variable that are not candy names and write them into a file. First, let us extract those variables from the `ID_HallCandy_raw` data frame, and call the new data frame `NotCandy_data`.
+
+```{r}
+NotCandy_data <- ID_HallCandy_raw %>%
+  select(-one_of(candy_names))
+
+NotCandy_data  %>%
+  head() 
+
+```
+
+Let us check the variable names in this data frame
+
+```{r}
+names(NotCandy_data) %>%
+  head()
+```
+
+We make the variable names in the `NotCandy_data` more meaningful. The code below makes a temporary data frame called `df` whose first columns contains the original names from the halloween data and the second column contains the new names we want to change.
+
+```{r}
+NamesDF  <- data_frame(
+  orig_name = c(
+    "id",
+    "age",
+    "Timestamp",
+    "Are you going actually going trick or treating yourself?",
+    "Guess the number of mints in my hand.",
+    "'That dress* that went viral early this year - when I first saw it, it was ________'",
+    "What is your favourite font?"),
+  new_name = c(
+    "id",
+    "age",
+    "timestamp",
+    "trick_or_treat",
+    "n_mints",
+    "dress",
+    "font")
+)
+
+
+NamesDF %>%
+  knitr::kable()
+```
+
+Now, we extract the columns containing the names we want to change
+
+```{r}
+NotCandy_data <- NotCandy_data %>%
+  select(one_of(NamesDF$orig_name))
+NotCandy_data
+```
+
+Let us delete the variable names in the `NotCandy_data` except the ones that matches the names in `orig_name`
+
+```{r}
+MatchResult <- match(NamesDF$orig_name, names(NotCandy_data))  # finds the names that matches
+names(NotCandy_data) <- NamesDF$new_name[MatchResult]   # replace the variable names in ID_data with new names
+NotCandy_data
+```
+
+We can also write this data frame into a file as follows
+
+```{r}
+write_csv(NotCandy_data, "candy-id.csv")
+```
+
+## Tidy the candy data
+
+Finally, we tidy the candy data. We shall gather the data and check which of them has `JOY` as thier entry.
+
+```{r}
+# tidy the data frame
+candy_dat <- candy_data_untidy %>%
+  gather(candy, joy,  -id) %>%  # collects variable and their values into a new data frame such that each variable is now a row
+  mutate(joy = joy == "JOY")  # set TRUE for all row with value = JOY and false otherwise
+
+```
+
+Then write the data to file called `candy-joy.csv`.
+
+```{r}
+write_csv(candy_dat, "candy-joy.csv")
+```
+
+This file is too large and will not be uploaded on github.
+
+
+# Work with a list: 
+
+Instruction: Work through and write up a lesson from the `purrr` tutorial: [Trump Android words](https://jennybc.github.io/purrr-tutorial/ls08_trump-tweets.html)
+
+Let's first load the required for this exercise.
+
+```{r}
+library(purrr)
+```
+
+## Loading the data set
+
+Now, let us load the data set `trump_tweets_df.rda` from file.
+
+```{r}
+load("trump_tweets_df.rda") # loads data set
+```
+
+We check some properties of the data set.
+
+```{r}
+typeof(trump_tweets_df)
+glimpse(trump_tweets_df)
+str(trump_tweets_df)
+dim(trump_tweets_df)
+```
+
+The data set has 1512 rows and 16 columns. We display first 6 rows of the data
+
+```{r}
+trump_tweets_df %>%
+  head() 
+```
+
+Next, extract the column called `text` from the data set and save it as `tweets. This is the data we shall be focusing on in this exercise.
+
+```{r}
+tweets <- trump_tweets_df$text
+
+tweets %>% 
+  head() %>% # displays first 6 entries
+  strtrim(70) # trim to only 70 characters (including space) per entry
+```
+
+## Trump Android words
+
+Below are some words that are known to be associated with Trump tweets from an Android device. These words are put together to form a string called `regex`.
+
+```{r}
+regex <- "badly|crazy|weak|spent|strong|dumb|joke|guns|funny|dead"
+regex
+```
+
+## Extracting trump android words
+
+The goal of this exercise is to extract these  words from the tweets stored, while practising `purrr` We begin by selecting some row from  `tweets` that have the complexity we would like to explore. This is because we can easily see what is going on if we have less rows. 
+
+```{r}
+tweets <- tweets[c(1, 2, 5, 6, 198, 347, 919)]
+tweets %>% 
+  strtrim(70)
+```
+
+Next, we use the base function `gregexpr()` to locate all the Trump Android words inside the tweets
+
+```{r}
+matches <- gregexpr(regex, tweets)
+str(matches)
+```
+
+This shows if the rows contains any of the `Trump Android word`. The information displaced by the `str()` function shows the attributes of matches for each tweet. We shall use the result for each tweet to explain the content of matches. Let us see what is contained in matches for the tweet in row 1 and row 3.
+
+```{r}
+matches[[1]]
+matches[[3]]
+```
+
+The first information in matches for each tweet indicates if a Trump Android word is in the tweet. If there is none of those words in the tweet, it displays `-1`, otherwise, it displace the position of the first character of each of the Android words encountered in the tweet. For instance, for the first tweet, `-1` is displayed which indicates there is no Trump android word in the tweet, while for the third tweet, `20` is displayed, this shows that there is an Andriod word in the tweet and the first character of the word is the 20th character of the tweet.
+
+The second information provided by matches is the length of the Android word in the tweet. It displays `-1` if none of those words exist in the tweet, otherwise, it displays the length of the word. Observe in the code above, the result for the second attribute is `-1` for tweet number 1, this is because the tweet does not contain any of the Android words. On the other hand, `5` is displayde for the third tweet, which indicate the length of the Trump android word  found in the tweet.
+
+One of our goals is to extract these words from the tweets.
+
+Let us check the length of the attributes for each tweet in matches. This can be done in different ways, hear are few of them;
+
+```{r}
+lengths(matches) 
+map_int(matches,length)  # purrr approach
+```
+
+We want to get a list of the length of the words encountered in each tweet. We shall write  a function that does this
+
+```{r}
+mlength <- function(x) {
+            attr(x, which="match.length")
+}
+
+match_length <- map(matches,mlength)
+match_length 
+```
+
+Although, this can also be achieved without writing a function.
+
+```{r}
+map(matches, ~attr(.,which = "match.length"))
+map(matches, ~attr(.x,which = "match.length"))
+map(matches, attr, which = "match.length")
+```
+
+Next, we want to count the number of Trump Android words that appears in each tweet.
+
+```{r}
+fun <- function(x) {
+  sum(x > 0)
+}
+
+map(matches,fun)
+```
+
+Another approach of getting the same result.
+
+```{r}
+map_int(matches,~sum(.x > 0))
+```
+
+
+We can also get this result using a slightly different approach. In this approach, we use the result of `match_length`. We know that if the is no Trump Android word in a line, the attribute is `-1`, otherwise, it will state the length of each of the words. We can take advantage of this and count how many number is displayed. The function below shows how to achieve this:
+
+```{r}
+fun2 <- function(x) {
+  if (x[1] > 0) {
+    length(x)} else 
+      return(0)
+}
+
+map(match_length,fun2)
+```
+
+This gives the same result as the first code.
+
+Let us show that the result we get here is different from the result you will get if you just take the length of  `matches`
+
+```{r}
+tibble(
+  naive_length = lengths(matches),
+  n_words =map_int(matches, ~sum(.x > 0))
+)
+```
+
+Let us remove attributes from the element of `matches`. We shall use `as.vector()` for this.
+
+```{r}
+match_first <- map(matches, as.vector)
+match_first
+```
+
+Now, we shall extract the `Trump` words from the tweets. Let us start with the 7th tweet.
+
+```{r}
+(tweet <- tweets[7])
+(t_first <- match_first[[7]])
+(t_length <- match_length[[7]])
+(t_last <- t_first + t_length - 1)
+substring(tweet, t_first, t_last)
+```
+
+How about the 3rd tweet?
+
+```{r}
+(tweet <- tweets[1])
+(t_first <- match_first[[1]])
+(t_length <- match_length[[1]])
+(t_last <- t_first + t_length - 1)
+substring(tweet, t_first, t_last)
+```
+
+The code works fine, but we can do better. Instead of displaying and empty string, we can just display something like `NA_character_`.
+
+  * Store where Trump words end
+
+We want to make a list that holds where the Trump words end, we shall call this list `match_last`. We shall use `purrr::map2()`
+
+```{r}
+match_last <- map2(match_first,match_length, ~ .x + .y -1)
+match_last
+```
+
+Let us write this in a function form
+
+```{r}
+fun_last <- function(x,y) {
+  last <- x + y - 1
+}
+
+map2(match_first,match_length,fun_last)
+```
+
+* Extract the Trump words
+
+We shall put everything together 
+
+```{r}
+pmap(list(text= tweets, first = match_first, last = match_last), substring)
+```
+
+* Match through the rows in data frame
+
+Let us work this problem in the context of data frame
+
+```{r}
+tweet_df <- tibble(
+  text = tweets,
+  first = match_first,
+  last = match_last
+)
+
+pmap(tweet_df,substring)
+
+```
+
+
+How about we use the data frame approach from the top?
+
+```{r}
+tibble(text = tweets,
+       first = gregexpr(regex, tweets)) %>%
+        mutate(match_length = map(first, ~ attr(.x, which = "match.length")),
+               last = map2(first, match_length, ~.x + .y - 1)) %>%
+        select(-match_length) %>%
+  pmap(substring)
+```
+
+So far we have been able to extract the Trump words in each tweets. Let us  perform this operation on the entire data set. We shall determine which of the tweets contains the Trump words and the words they contain.
+
+We begin by considering the entire tweets and determine which of them contain the Trumps words. This can be done using the previously developed code.
+
+```{r}
+tweets <- trump_tweets_df$text
+
+TweetWord <- tibble(text = tweets,
+         first = gregexpr(regex, tweets)) %>%
+          mutate(match_length = map(first, ~ attr(.x, which = "match.length")),
+                 last = map2(first, match_length, ~.x + .y - 1)) %>%
+          select(-match_length) %>%
+    pmap(substring)
+
+TweetWord %>%
+  head()
+
+```
+
+Next, we extract the tweets that contain the words.
+
+
+```{r}
+Num_char <- nchar(TweetWord)
+Ind <- which(Num_char > 0)
+tweets[Ind] %>% 
+  head() %>%
+  strtrim(80)
+
+Ttweets <- tweets[Ind]
+
+```
+
+These are the tweest that contain the Trump words. Let us see the words each of the contain
+
+```{r}
+Num_char <- nchar(TweetWord)
+Ind <- which(Num_char > 0)
+TweetWord[Ind] %>%
+  head()
+
+TWords <- TweetWord[Ind] 
+TWords[1:5]
+```
+
+Let us tidy this data into data frame.
+
+```{r}
+TWEETS_DF <- tibble(
+ Tweets = Ttweets,
+  Trump_Words = TWords
+)
+
+TWEETS_DF %>%
+    head(15) %>%
+    knitr::kable()
+```
+
+
+Lastly, we write the data into file.
+
+```{r}
+saveRDS(TWEETS_DF,"Trump_Tweets.rds")
+```
+
+
+
+# Character data: 
+
+I just few exercises here...
+
+Read and work the exercises in the [Strings chapter](https://r4ds.had.co.nz/strings.html) of R for data science
+
+
+## Exercise 14.2.5: 
+
+* Question 1: In code that doesn't use stringr, you'll often see `paste()` and `paste0()`. What is the difference between the two functions? What stringr function are ther equivalent to ? How do the functions differ in their handling of `NA`?
+
+Let us start by checking how the functions `paste()` and `paste0()` work;
+
+```{r}
+paste("Mango","Orange","Banana")
+```
+
+Observe that the `paste()` function concatenate strings and separate them by space. It makes a single string from a collection of strings.
+
+```{r}
+paste0("Mango","Orange","Banana")
+```
+
+while the `paste0()` function concatenate the strings without space between them.
+
+Let us determine which `stringr` functions are equivalent to the `paste()` and `paste0()`
+
+```{r}
+str_c("Mango","Orange","Banana")
+```
+
+This shows that the function `str_c()` in stringr is equivalent to the `paste0()` function 
+
+```{r}
+str_c("Mango","Orange","Banana", sep = " ")
+```
+
+And also the `str_c()` function when used as shown above is equivalent to the `paste()` function. Let us check how these function handle `NA`;
+
+```{r}
+StringS <- str_c("Mango","Orange","Banana",NA)
+StringS
+```
+
+```{r}
+StringSA <- str_c("Mango","Orange","Banana",NA, sep = " ")
+StringSA
+```
+
+
+Question 2: In your own words, describe the difference between the `sep` and `collapse` arguments to `str_c()`
+
+```{r}
+str_c("Mango","Orange","Banana", sep = " ") # separate the strings with a space
+str_c("Mango","Orange","Banana", sep = ",") # separate the strings with a comma
+str_c("Mango","Orange","Banana", sep = "$") # separate the strings with a dollar sign
+```
+
+The `sep` argument is used to specifies what you want to use to separate the strings. For instance, I have shown that we can separate the strings with space 
+
+```{r}
+str_c("Mango","Orange","Banana", collapse ="")
+```
+
+The `collapse` argument is used to combine the strings together without any space between them.
+
+
+Question 3: Use `str_length()` and `str_sub()` to extract the middle character from a string. What will you do if the string has an even even number of character?
+
+```{r}
+# create a function that counts the lenght of a vectors
+num <- function(x)
+          str_length(c(x))
+
+# call the function with a string 
+x <- c("Orange")
+xn <- num(x)
+
+# write a function that extracts the middle character and call it 'middle'
+middle <- function(x){
+        if (num(x) %% 2 != 0) {
+          str_sub(x,ceiling(num(x)/2),ceiling(num(x)/2)) # if odd it return middle character
+        } else {
+           str_sub(x,ceiling(num(x)/2),ceiling(num(x)/2)+1) # if even it returns the two middle character
+          }
+}
+
+# test with a string with odd length
+x <- c("Mango")
+middle(x)
+
+
+# test with a string with odd length
+x <- c("Orange")
+middle(x)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
