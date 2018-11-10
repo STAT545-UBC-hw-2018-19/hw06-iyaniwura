@@ -10,6 +10,8 @@ editor_options:
   chunk_output_type: inline
 ---
 
+[Please click here for a .html version of the assignment](https://iyaniwura.github.io/hw5/Homework6.html)
+
 # Loading libraries
 
 First, we load the necessary libraries required for the exercises in this assignment:
